@@ -50,6 +50,7 @@ dependencies = [
  "chrono",
  "chrono-humanize",
  "diffy",
+ "dotenv",
  "env_logger",
  "failure",
  "futures",
@@ -216,6 +217,12 @@ checksum = "e616e59155c92257e84970156f506287853355f58cd4a6eb167385722c32b790"
 dependencies = [
  "nu-ansi-term",
 ]
+
+[[package]]
+name = "dotenv"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
 
 [[package]]
 name = "dtoa"
