@@ -328,6 +328,12 @@ async fn get_rust_percentage(github_url: &str) -> Option<f64> {
         }
         Ok(ok) => {
             let raw = ok.text().await.unwrap();
+            // Example of response:
+            // {
+            //     "Rust": 1000,
+            //     "Python": 500,
+            //     "Shell": 100
+            // }
             let data = match serde_json::from_str::<GitHubLanguageInfo>(&raw) {
                 Ok(val) => val,
                 Err(_) => {
@@ -614,7 +620,7 @@ async fn main() -> Result<(), Error> {
                             let new_url = url.to_string();
                             if POPULARITY_OVERRIDES.contains(&new_url) {
                                 github_stars = Some(MINIMUM_GITHUB_STARS);
-                                continue;
+                                // github_rust_percentage = Some(MINIMUM_RUST_PERCENTAGE);
                             } else if GITHUB_REPO_REGEX.is_match(&url) {
                                 let github_url = GITHUB_REPO_REGEX
                                     .replace_all(&url, "https://github.com/$org/$repo")
@@ -639,7 +645,6 @@ async fn main() -> Result<(), Error> {
                                                 )?;
                                             }
                                             link_count += 1;
-                                            continue;
                                         }
                                     }
                                 }
@@ -651,12 +656,14 @@ async fn main() -> Result<(), Error> {
                                     if let Some(rust_percentage) = existing_github_rust_percentage {
                                         github_rust_percentage = Some(*rust_percentage);
                                     } else {
-                                        let rust_percentage = get_rust_percentage(&github_url).await;
+                                        let rust_percentage =
+                                            get_rust_percentage(&github_url).await;
                                         if let Some(raw_rust_percentage) = rust_percentage {
                                             github_rust_percentage = Some(raw_rust_percentage);
-                                            popularity_data
-                                                .github_rust_percentage
-                                                .insert(github_url.to_string(), raw_rust_percentage);
+                                            popularity_data.github_rust_percentage.insert(
+                                                github_url.to_string(),
+                                                raw_rust_percentage,
+                                            );
                                             if raw_rust_percentage >= required_rust_percentage {
                                                 fs::write(
                                                     "results/popularity.yaml",
@@ -664,15 +671,13 @@ async fn main() -> Result<(), Error> {
                                                 )?;
                                             }
                                             link_count += 1;
-                                            continue;
                                         }
                                     }
                                 } else if github_rust_percentage.is_none() {
                                     github_rust_percentage = Some(MINIMUM_RUST_PERCENTAGE);
-                                    continue;
                                 }
-                            }
-                            if CRATE_REGEX.is_match(&url) {
+                                continue;
+                            } else if CRATE_REGEX.is_match(&url) {
                                 let existing = popularity_data.cargo_downloads.get(&new_url);
                                 if let Some(downloads) = existing {
                                     cargo_downloads = Some(*downloads);
