@@ -22,7 +22,7 @@ use tokio::sync::SemaphorePermit;
 
 const MINIMUM_GITHUB_STARS: u32 = 50;
 const MINIMUM_CARGO_DOWNLOADS: u32 = 2000;
-const MINIMUM_RUST_CODEBASE: f64 = 0.2;
+const MINIMUM_RUST_PERCENTAGE: f64 = 0.5;
 
 // Allow overriding the needed stars for a section. "level" is the header level in the markdown, default is MINIMUM_GITHUB_STARS
 // In general, we should just use the defaults. However, for some areas where there's not a lot of well-starred projects, but a
@@ -39,11 +39,11 @@ fn override_stars(level: u32, text: &str) -> Option<u32> {
     }
 }
 
-// Allow overriding the needed percentage for a section. "level" is the header level in the markdown, default is MINIMUM_RUST_CODEBASE
+// Allow overriding the needed percentage for a section. "level" is the header level in the markdown, default is MINIMUM_RUST_PERCENTAGE
 // In general, we should just use the defaults. However, some projects includes a lot a other file types, like GAMES and resource files,
 // then it's worth reducing the thresholds so we can get a few more projects.
-fn override_rust_codebase(level: u32, text: &str) -> Option<f64> {
-    if level == 2 && text.contains("Games") {
+fn override_rust_percentage(level: u32, text: &str) -> Option<f64> {
+    if level == 3 && text.contains("Games") {
         // This is zero because a lot of the resources are non-github/non-cargo links and overriding for all would be annoying
         // These should be evaluated with more primitive means
         Some(0.0)
@@ -87,8 +87,71 @@ lazy_static! {
         "https://github.com/andoriyu/uclicious".to_string() // FIXME: CI hack. the crate has a higher count, but we don't refresh.
     ];
 
-    static ref RUST_CODEBASE_OVERRIDE: Vec<String> = vec![
-        "https://github.com/servo/servo".to_string(), // Servo is a large project with a lot of non-Rust code
+    static ref RUST_PERCENTAGE_OVERRIDE: Vec<String> = vec![
+        "https://github.com/servo/servo".to_string(), // Servo is a Rust-written Web Browser, but doesn't expose language information
+        "https://github.com/Saecki/crates.nvim".into(),
+        "https://github.com/ZoeyR/rls-vs2017".into(),
+        "https://github.com/brotzeit/rustic".into(),
+        "https://github.com/cs01/gdbgui".into(),
+        "https://github.com/emk/heroku-buildpack-rust".into(),
+        "https://github.com/emk/rust-musl-builder".into(),
+        "https://github.com/fiatjaf/module-linker".into(),
+        "https://github.com/japaric/rust-cross".into(),
+        "https://github.com/liuchong/docker-rustup".into(),
+        "https://github.com/mrhooray/torch".into(),
+        "https://github.com/nix-community/fenix".into(),
+        "https://github.com/peaceiris/actions-mdbook".into(),
+        "https://github.com/racer-rust/emacs-racer".into(),
+        "https://github.com/racer-rust/vim-racer".into(),
+        "https://github.com/rust-lang/docker-rust".into(),
+        "https://github.com/rust-lang/rust.vim".into(),
+        "https://github.com/serayuzgur/crates".into(),
+        "https://github.com/servo/servo".into(),
+        "https://github.com/vamolessa/verco".into(),
+        "https://github.com/warpdotdev/Warp".into(),
+        "https://github.com/eclipse-corrosion/corrosion".into(),
+        "https://github.com/madeso/ride".into(),
+        "https://github.com/rust-lang/rust-mode".into(),
+        "https://github.com/emacs-ng/emacs-ng".into(),
+        "https://github.com/SiegeLord/RustCMake".into(),
+        "https://github.com/Devolutions/CMakeRust".into(),
+        "https://github.com/intellij-rust/intellij-rust".into(),
+        "https://github.com/flycheck/flycheck-rust".into(),
+        "https://github.com/zcash/zcash".into(),
+        "https://github.com/ashvardanian/StringZilla".into(),
+        "https://github.com/vorot93/libmdbx-rs".into(),
+        "https://github.com/kpcyrd/mini-docker-rust".into(),
+        "https://github.com/unum-cloud/usearch".into(),
+        "https://github.com/PistonDevelopers/VisualRust".into(),
+        "https://github.com/tickbh/td_rlua".into(),
+        "https://github.com/getsentry/milksnake".into(),
+        "https://github.com/wasmerio/winterjs".into(),
+        "https://github.com/jcmoyer/rust-lua53".into(),
+        "https://github.com/icepuma/rust-action".into(),
+        "https://github.com/huhu/rust-search-extension".into(),
+        "https://github.com/thewh1teagle/mobslide".into(),
+        "https://github.com/drrb/java-rust-example".into(),
+        "https://github.com/fractalide/fractalide".into(),
+        "https://github.com/xiph/rav1e".into(),
+        "https://github.com/tomaka/hlua".into(),
+        "https://github.com/koute/bytehound".into(),
+        "https://github.com/rust-cross/rust-musl-cross".into(),
+        "https://github.com/japaric/trust".into(),
+        "https://github.com/1History/1History".into(),
+        "https://github.com/bencherdev/bencher".into(),
+        "https://github.com/thewh1teagle/vibe".into(),
+        "https://github.com/atomicdata-dev/atomic-server".into(),
+        "https://github.com/lancedb/lancedb".into(),
+        "https://github.com/rust-lang/rust-enhanced".into(),
+        "https://github.com/defguard/defguard".into(),
+        "https://github.com/upvpn/upvpn-app".into(),
+        "https://github.com/llogiq/flame".into(),
+        "https://github.com/openobserve/openobserve".into(),
+        "https://github.com/mozilla/cbindgen".into(),
+        "https://github.com/mcthesw/game-save-manager".into(),
+        "https://github.com/deps-rs/deps.rs".into(),
+        "https://github.com/denoland/deno".into(),
+        "https://github.com/inspektor-dev/inspektor".into(),
     ];
 }
 
@@ -203,7 +266,7 @@ struct GitHubStars {
     archived: bool,
 }
 
-type GitHubCodebase = HashMap<String, usize>;
+type GitHubLanguageInfo = HashMap<String, usize>;
 
 async fn get_stars(github_url: &str) -> Option<u32> {
     warn!("Downloading GitHub stars for {}", github_url);
@@ -241,11 +304,8 @@ async fn get_stars(github_url: &str) -> Option<u32> {
     }
 }
 
-async fn get_rust_codebase_percentage(github_url: &str) -> Option<f64> {
-    warn!(
-        "Downloading GitHub Rust Codebase percentage for {}",
-        github_url
-    );
+async fn get_rust_percentage(github_url: &str) -> Option<f64> {
+    warn!("Downloading GitHub language information for {}", github_url);
     let rewritten = GITHUB_REPO_REGEX
         .replace_all(
             github_url,
@@ -268,29 +328,35 @@ async fn get_rust_codebase_percentage(github_url: &str) -> Option<f64> {
         }
         Ok(ok) => {
             let raw = ok.text().await.unwrap();
-            let data = match serde_json::from_str::<GitHubCodebase>(&raw) {
+            let data = match serde_json::from_str::<GitHubLanguageInfo>(&raw) {
                 Ok(val) => val,
                 Err(_) => {
                     panic!("{:?} {}", raw, rewritten);
                 }
             };
             if data.is_empty() {
-                warn!("{} has no codebase, so ignoring rust codebase", github_url);
-                return Some(0.0);
-            }
-            if !data.contains_key("Rust") {
                 warn!(
-                    "{} has no Rust codebase, so ignoring rust codebase",
+                    "{} has no language information, so ignoring Rust lines percentage",
                     github_url
                 );
                 return Some(0.0);
             }
-            let rust_codebase: f64 = *data
-                .get("Rust")
-                .expect("Rust codebase not found, but should")
-                as f64;
-            let total_codebase: f64 = data.values().sum::<usize>() as f64;
-            Some(rust_codebase.div(total_codebase))
+            if !data.contains_key("Rust") {
+                warn!(
+                    "{} has no Rust code, so ignoring Rust lines percentage",
+                    github_url
+                );
+                return Some(0.0);
+            }
+            let total_lines: f64 = data.values().sum::<usize>() as f64;
+            let rust_lines: f64 = data.get("Rust").cloned().unwrap() as f64;
+
+            // Checking for division by zero, but this should never happen
+            if total_lines > 0.0 {
+                Some(rust_lines.div(total_lines))
+            } else {
+                Some(0.0)
+            }
         }
     }
 }
@@ -467,7 +533,7 @@ type Results = BTreeMap<String, Link>;
 #[derive(Debug, Serialize, Deserialize)]
 struct PopularityData {
     pub github_stars: BTreeMap<String, u32>,
-    pub github_rust_codebase: BTreeMap<String, f64>,
+    pub github_rust_percentage: BTreeMap<String, f64>,
     pub cargo_downloads: BTreeMap<String, u32>,
 }
 
@@ -489,7 +555,7 @@ async fn main() -> Result<(), Error> {
         .and_then(|x| serde_yaml::from_str(&x).map_err(|e| format_err!("{}", e)))
         .unwrap_or(PopularityData {
             github_stars: BTreeMap::new(),
-            github_rust_codebase: BTreeMap::new(),
+            github_rust_percentage: BTreeMap::new(),
             cargo_downloads: BTreeMap::new(),
         });
 
@@ -530,14 +596,14 @@ async fn main() -> Result<(), Error> {
 
     let mut link_count: u8 = 0;
     let mut github_stars: Option<u32> = None;
-    let mut github_rust_codebase: Option<f64> = None;
+    let mut github_rust_percentage: Option<f64> = None;
     let mut cargo_downloads: Option<u32> = None;
 
     let mut required_stars: u32 = MINIMUM_GITHUB_STARS;
-    let mut required_rust_codebase: f64 = MINIMUM_RUST_CODEBASE;
+    let mut required_rust_percentage: f64 = MINIMUM_RUST_PERCENTAGE;
     let mut last_level: u32 = 0;
     let mut star_override_level: Option<u32> = None;
-    let mut rust_codebase_override_level: Option<u32> = None;
+    let mut rust_percentage_override_level: Option<u32> = None;
 
     for (event, _range) in parser.into_offset_iter() {
         match event {
@@ -577,22 +643,21 @@ async fn main() -> Result<(), Error> {
                                         }
                                     }
                                 }
-                                if github_rust_codebase.is_none()
-                                    && !RUST_CODEBASE_OVERRIDE.contains(&new_url)
+                                if github_rust_percentage.is_none()
+                                    && !RUST_PERCENTAGE_OVERRIDE.contains(&new_url)
                                 {
-                                    let existing_github_rust_codebase =
-                                        popularity_data.github_rust_codebase.get(&github_url);
-                                    if let Some(rust_codebase) = existing_github_rust_codebase {
-                                        github_rust_codebase = Some(*rust_codebase);
+                                    let existing_github_rust_percentage =
+                                        popularity_data.github_rust_percentage.get(&github_url);
+                                    if let Some(rust_percentage) = existing_github_rust_percentage {
+                                        github_rust_percentage = Some(*rust_percentage);
                                     } else {
-                                        let rust_codebase =
-                                            get_rust_codebase_percentage(&github_url).await;
-                                        if let Some(raw_rust_codebase) = rust_codebase {
-                                            github_rust_codebase = Some(raw_rust_codebase);
+                                        let rust_percentage = get_rust_percentage(&github_url).await;
+                                        if let Some(raw_rust_percentage) = rust_percentage {
+                                            github_rust_percentage = Some(raw_rust_percentage);
                                             popularity_data
-                                                .github_rust_codebase
-                                                .insert(github_url.to_string(), raw_rust_codebase);
-                                            if raw_rust_codebase >= MINIMUM_RUST_CODEBASE {
+                                                .github_rust_percentage
+                                                .insert(github_url.to_string(), raw_rust_percentage);
+                                            if raw_rust_percentage >= required_rust_percentage {
                                                 fs::write(
                                                     "results/popularity.yaml",
                                                     serde_yaml::to_string(&popularity_data)?,
@@ -602,8 +667,8 @@ async fn main() -> Result<(), Error> {
                                             continue;
                                         }
                                     }
-                                } else if github_rust_codebase.is_none() {
-                                    github_rust_codebase = Some(MINIMUM_RUST_CODEBASE);
+                                } else if github_rust_percentage.is_none() {
+                                    github_rust_percentage = Some(MINIMUM_RUST_PERCENTAGE);
                                     continue;
                                 }
                             }
@@ -651,7 +716,7 @@ async fn main() -> Result<(), Error> {
                         list_item = String::new();
                         link_count = 0;
                         github_stars = None;
-                        github_rust_codebase = None;
+                        github_rust_percentage = None;
                         cargo_downloads = None;
                     }
                     Tag::Heading(level) => {
@@ -662,10 +727,10 @@ async fn main() -> Result<(), Error> {
                                 required_stars = MINIMUM_GITHUB_STARS;
                             }
                         }
-                        if let Some(override_level) = rust_codebase_override_level {
+                        if let Some(override_level) = rust_percentage_override_level {
                             if level == override_level {
-                                rust_codebase_override_level = None;
-                                required_rust_codebase = MINIMUM_RUST_CODEBASE;
+                                rust_percentage_override_level = None;
+                                required_rust_percentage = MINIMUM_RUST_PERCENTAGE;
                             }
                         }
                     }
@@ -684,10 +749,10 @@ async fn main() -> Result<(), Error> {
                     required_stars = override_value;
                 }
 
-                let possible_rust_codebase_override = override_rust_codebase(last_level, &text);
-                if let Some(override_value) = possible_rust_codebase_override {
-                    rust_codebase_override_level = Some(last_level);
-                    required_rust_codebase = override_value;
+                let possible_rust_percentage_override = override_rust_percentage(last_level, &text);
+                if let Some(override_value) = possible_rust_percentage_override {
+                    rust_percentage_override_level = Some(last_level);
+                    required_rust_percentage = override_value;
                 }
 
                 if in_list_item {
@@ -700,16 +765,17 @@ async fn main() -> Result<(), Error> {
                         if !list_item.is_empty() {
                             if link_count > 0
                                 && (github_stars.unwrap_or(0) < required_stars
-                                    || github_rust_codebase.unwrap_or(0.0) < required_rust_codebase)
+                                    || github_rust_percentage.unwrap_or(0.0)
+                                        < required_rust_percentage)
                                 && cargo_downloads.unwrap_or(0) < MINIMUM_CARGO_DOWNLOADS
                             {
-                                if github_stars.is_none() || github_rust_codebase.is_none() {
+                                if github_stars.is_none() || github_rust_percentage.is_none() {
                                     warn!("No valid github link");
                                 }
                                 if cargo_downloads.is_none() {
                                     warn!("No valid crates link");
                                 }
-                                return Err(format_err!("Not high enough metrics ({:?} stars < {}, {:?} rust codebase percentage< {}, and {:?} cargo downloads < {}): {}", github_stars, required_stars, github_rust_codebase, required_rust_codebase, cargo_downloads, MINIMUM_CARGO_DOWNLOADS, list_item));
+                                return Err(format_err!("Not high enough metrics ({:?} stars < {}, {:?} Rust percentage < {}, and {:?} cargo downloads < {}): {}", github_stars, required_stars, github_rust_percentage, required_rust_percentage, cargo_downloads, MINIMUM_CARGO_DOWNLOADS, list_item));
                             }
                             if link_count > 0 && !ITEM_REGEX.is_match(&list_item) {
                                 return Err(format_err!("Item does not match the template: \"{list_item}\". See https://github.com/rust-unofficial/awesome-rust/blob/main/CONTRIBUTING.md#tldr"));
