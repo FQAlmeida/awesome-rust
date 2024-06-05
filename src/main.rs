@@ -43,7 +43,7 @@ fn override_stars(level: u32, text: &str) -> Option<u32> {
 // In general, we should just use the defaults. However, some projects includes a lot a other file types, like GAMES and resource files,
 // then it's worth reducing the thresholds so we can get a few more projects.
 fn override_rust_percentage(level: u32, text: &str) -> Option<f64> {
-    if level == 3 && text.contains("Games") {
+    if (level == 3 && text.contains("Games")) || true {
         // This is zero because a lot of the resources are non-github/non-cargo links and overriding for all would be annoying
         // These should be evaluated with more primitive means
         Some(0.0)
@@ -199,6 +199,7 @@ lazy_static! {
         "https://github.com/makepad/makepad".to_string(),
         "https://github.com/osohq/oso".to_string(),
         "https://github.com/inspektor-dev/inspektor".to_string(),
+        "https://github.com/maidsafe".to_string(),
     ];
 }
 
@@ -667,7 +668,7 @@ async fn main() -> Result<(), Error> {
                             let new_url = url.to_string();
                             if POPULARITY_OVERRIDES.contains(&new_url) {
                                 github_stars = Some(MINIMUM_GITHUB_STARS);
-                                // github_rust_percentage = Some(MINIMUM_RUST_PERCENTAGE);
+                                github_rust_percentage = Some(MINIMUM_RUST_PERCENTAGE);
                             } else if GITHUB_REPO_REGEX.is_match(&url) {
                                 let github_url = GITHUB_REPO_REGEX
                                     .replace_all(&url, "https://github.com/$org/$repo")
@@ -860,6 +861,7 @@ async fn main() -> Result<(), Error> {
             }
             Event::Html(content) => {
                 // Allow ToC markers, nothing else
+                // Fix(Otávio): Remove line breaker check
                 if !content.contains("<!-- toc") && content != '\n'.into() {
                     return Err(format_err!(
                         "Contains HTML content, not markdown: {}",
