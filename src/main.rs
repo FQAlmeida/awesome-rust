@@ -8,12 +8,15 @@ use lazy_static::lazy_static;
 use log::{debug, info, warn};
 use pulldown_cmark::{Event, Parser, Tag};
 use regex::Regex;
+use reqwest::Response;
 use reqwest::{header, redirect::Policy, Client, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::env;
+use std::future::Future;
 use std::io::Write;
 use std::ops::Div;
+use std::pin::Pin;
 use std::time;
 use std::u8;
 use std::{cmp::Ordering, fs};
@@ -43,7 +46,7 @@ fn override_stars(level: u32, text: &str) -> Option<u32> {
 // In general, we should just use the defaults. However, some projects includes a lot a other file types, like GAMES and resource files,
 // then it's worth reducing the thresholds so we can get a few more projects.
 fn override_rust_percentage(level: u32, text: &str) -> Option<f64> {
-    if (level == 3 && text.contains("Games")) || true {
+    if level == 3 && text.contains("Games") {
         // This is zero because a lot of the resources are non-github/non-cargo links and overriding for all would be annoying
         // These should be evaluated with more primitive means
         Some(0.0)
@@ -84,9 +87,62 @@ lazy_static! {
         "https://github.com/esp-rs".to_string(), // Espressif Rust Organization (Organizations have no stars).
         "https://github.com/arkworks-rs".to_string(), // Rust ecosystem for zkSNARK programming (Organizations have no stars)
         "https://marketplace.visualstudio.com/items?itemName=jinxdash.prettier-rust".to_string(), // https://github.com/jinxdash/prettier-plugin-rust has >50 stars
-        "https://github.com/andoriyu/uclicious".to_string() // FIXME: CI hack. the crate has a higher count, but we don't refresh.
+
+
+        "https://speakerdeck.com/jvns/learning-systems-programming-with-rust".to_string(), // FIXME: Check this
+        "https://www.youtube.com/watch?v=lO1z-7cuRYI".to_string(), // FIXME: Check this
+        "https://www.youtube.com/watch?v=t4CyEKb-ywA".to_string(), // FIXME: Check this
+        "https://kandi.openweaver.com/explorelibrary/rust".to_string(), // FIXME: Check this
+        "https://rustbeginners.github.io/awesome-rust-mentors/".to_string(), // FIXME: Check this
+        "http://cis198-2016s.github.io/schedule/".to_string(), // FIXME: Check this
+        "https://github.com/jamesmunns/awesome-rust-streaming".to_string(), // FIX: Check this
+        "https://rustbeginners.github.io/awesome-rust-mentors/".to_string(), // FIX: Check this
+        "https://blog.subnetzero.io/post/building-language-vm-part-00/".to_string(), // FIX: Check this
+        "https://app.codecrafters.io/tracks/rust".to_string(), // FIX: Check this
+        "https://google.github.io/comprehensive-rust/".to_string(), // FIX: Check this
+        "https://github.com/Dhghomon/easy_rust".to_string(), // FIX: Check this
+        "https://exercism.org/tracks/rust".to_string(), // FIX: Check this
+        "https://pragprog.com/titles/hwrust/hands-on-rust/".to_string(), // FIX: Check this
+        "https://github.com/mre/idiomatic-rust".to_string(), // FIX: Check this
+        "https://github.com/cuppar/rtd".to_string(), // FIX: Check this
+        "https://rust-unofficial.github.io/too-many-lists/".to_string(), // FIX: Check this
+        "https://lborb.github.io/book/".to_string(), // FIX: Check this
+        "https://hackr.io/tutorials/learn-rust".to_string(), // FIX: Check this
+        "https://www.manning.com/books/refactoring-to-rust".to_string(), // FIX: Check this
+        "https://doc.rust-lang.org/rust-by-example/".to_string(), // FIX: Check this
+        "https://rust-lang-nursery.github.io/rust-cookbook/".to_string(), // FIX: Check this
+        "https://github.com/ad-si/Rust-Flashcards".to_string(), // FIX: Check this
+        "https://overexact.com/rust-for-professionals/".to_string(), // FIX: Check this
+        "https://github.com/warycat/rustgym".to_string(), // FIX: Check this
+        "https://www.manning.com/books/rust-in-action".to_string(), // FIX: Check this
+        "https://www.manning.com/livevideo/rust-in-motion?a_aid=cnichols&a_bid=6a993c2e".to_string(), // FIX: Check this
+        "https://cheats.rs/".to_string(), // FIX: Check this
+        "https://rust-tieng-viet.github.io/".to_string(), // FIX: Check this
+        "https://github.com/jondot/rust-how-do-i-start".to_string(), // FIX: Check this
+        "https://github.com/ctjhoa/rust-learning".to_string(), // FIX: Check this
+        "https://github.com/rust-lang/rustlings".to_string(), // FIX: Check this
+        "https://github.com/AbdesamedBendjeddou/Rusty-CS".to_string(), // FIX: Check this
+        "https://github.com/brson/stdx".to_string(), // FIX: Check this
+        "https://learn.microsoft.com/en-us/training/paths/rust-first-steps/".to_string(), // FIX: Check this
+        "https://tourofrust.com".to_string(), // FIX: Check this
+
+        "https://newrustacean.com".to_string(), // FIX: Check this
+        "https://rustacean-station.org/".to_string(), // FIX: Check this
+
+        "http://aturon.github.io/".to_string(), // FIX: Check this
+        "https://www.manning.com/books/rust-servers-services-and-apps".to_string(), // FIX: Check this
+        "https://www.reddit.com/r/rust/".to_string(), // FIX: Check this
+        "https://github.com/sger/RustBooks".to_string(), // FIX: Check this
+        "https://www.youtube.com/playlist?list=PLE7tQUdRKcybdIw61JpCoo89i4pWU5f_t".to_string(), // FIX: Check this
+        "https://github.com/rustviz/rustviz".to_string(), // FIX: Check this
+        "https://www.youtube.com/watch?v=jf_ddGnum_4".to_string(), // FIX: Check this
     ];
 
+    static ref STAR_COUNT_OVERRIDE: Vec<String> = vec![
+        "https://github.com/andoriyu/uclicious".to_string(), // FIXME: CI hack. the crate has a higher count, but we don't refresh.
+    ];
+
+    // All repos that dont have a explanation for why they are overriden, is becuase they were added before this feature
     static ref RUST_PERCENTAGE_OVERRIDE: Vec<String> = vec![
         "https://github.com/servo/servo".to_string(), // Servo is a Rust-written Web Browser, but doesn't expose language information
         "https://github.com/AbdesamedBendjeddou/Rusty-CS".to_string(),
@@ -199,7 +255,6 @@ lazy_static! {
         "https://github.com/makepad/makepad".to_string(),
         "https://github.com/osohq/oso".to_string(),
         "https://github.com/inspektor-dev/inspektor".to_string(),
-        "https://github.com/maidsafe".to_string(),
     ];
 }
 
@@ -308,6 +363,30 @@ lazy_static! {
         Regex::new(r"(?P<repo>(\S+)(/\S+)?)(?P<crate> \[\S*\])? — (?P<desc>\S.+)").unwrap();
 }
 
+// TODO: Create a better request flow
+fn github_follow_redirect(
+    res: Response,
+) -> Pin<Box<dyn Future<Output = Result<Response, reqwest::Error>>>> {
+    if res.status().is_redirection() {
+        let location = res.headers().get("location").unwrap().to_str().unwrap();
+        let mut req = CLIENT.get(location);
+        if let Ok(username) = env::var("USERNAME_FOR_GITHUB") {
+            if let Ok(password) = env::var("TOKEN_FOR_GITHUB") {
+                // needs a token with at least public_repo scope
+                req = req.basic_auth(username, Some(password));
+            }
+        }
+        Box::pin(async move {
+            match req.send().await {
+                Ok(res) => github_follow_redirect(res).await,
+                Err(e) => Err(e),
+            }
+        })
+    } else {
+        Box::pin(async { Ok(res) })
+    }
+}
+
 #[derive(Deserialize, Debug)]
 struct GitHubStars {
     stargazers_count: u32,
@@ -336,11 +415,16 @@ async fn get_stars(github_url: &str) -> Option<u32> {
             None
         }
         Ok(ok) => {
-            let raw = ok.text().await.unwrap();
+            let followed = github_follow_redirect(ok).await;
+            if let Err(err) = followed {
+                warn!("Error while following redirect for {}: {}", github_url, err);
+                return None;
+            }
+            let raw = followed.unwrap().text().await.unwrap();
             let data = match serde_json::from_str::<GitHubStars>(&raw) {
                 Ok(val) => val,
                 Err(_) => {
-                    panic!("{:?}", raw);
+                    panic!("{} {:?}", github_url, raw);
                 }
             };
             if data.archived {
@@ -375,7 +459,12 @@ async fn get_rust_percentage(github_url: &str) -> Option<f64> {
             None
         }
         Ok(ok) => {
-            let raw = ok.text().await.unwrap();
+            let followed = github_follow_redirect(ok).await;
+            if let Err(err) = followed {
+                warn!("Error while following redirect for {}: {}", github_url, err);
+                return None;
+            }
+            let raw = followed.unwrap().text().await.unwrap();
             // Example of response:
             // {
             //     "Rust": 1000,
@@ -385,7 +474,7 @@ async fn get_rust_percentage(github_url: &str) -> Option<f64> {
             let data = match serde_json::from_str::<GitHubLanguageInfo>(&raw) {
                 Ok(val) => val,
                 Err(_) => {
-                    panic!("{:?} {}", raw, rewritten);
+                    panic!("{} {:?} {}", github_url, raw, rewritten);
                 }
             };
             if data.is_empty() {
@@ -666,6 +755,8 @@ async fn main() -> Result<(), Error> {
                     Tag::Link(_link_type, url, _title) | Tag::Image(_link_type, url, _title) => {
                         if !url.starts_with('#') {
                             let new_url = url.to_string();
+
+                            // Check if all metrics should be overridden
                             if POPULARITY_OVERRIDES.contains(&new_url) {
                                 github_stars = Some(MINIMUM_GITHUB_STARS);
                                 github_rust_percentage = Some(MINIMUM_RUST_PERCENTAGE);
@@ -673,7 +764,11 @@ async fn main() -> Result<(), Error> {
                                 let github_url = GITHUB_REPO_REGEX
                                     .replace_all(&url, "https://github.com/$org/$repo")
                                     .to_string();
-                                if github_stars.is_none() {
+                                // Check if stars should be overridden
+                                if STAR_COUNT_OVERRIDE.contains(&new_url) {
+                                    // if github stars is not none, maybe max(github_start, MINIMUM_GITHUB_STARS)
+                                    github_stars = Some(MINIMUM_GITHUB_STARS);
+                                } else if github_stars.is_none() {
                                     let existing_github_stars =
                                         popularity_data.github_stars.get(&github_url);
                                     if let Some(stars) = existing_github_stars {
@@ -696,9 +791,10 @@ async fn main() -> Result<(), Error> {
                                         }
                                     }
                                 }
-                                if github_rust_percentage.is_none()
-                                    && !RUST_PERCENTAGE_OVERRIDE.contains(&new_url)
-                                {
+                                if RUST_PERCENTAGE_OVERRIDE.contains(&new_url) {
+                                    // if github rust percentage is not none, maybe max(github_rust_percentage, MINIMUM_RUST_PERCENTAGE)
+                                    github_rust_percentage = Some(MINIMUM_RUST_PERCENTAGE);
+                                } else if github_rust_percentage.is_none() {
                                     let existing_github_rust_percentage =
                                         popularity_data.github_rust_percentage.get(&github_url);
                                     if let Some(rust_percentage) = existing_github_rust_percentage {
@@ -721,8 +817,6 @@ async fn main() -> Result<(), Error> {
                                             link_count += 1;
                                         }
                                     }
-                                } else if github_rust_percentage.is_none() {
-                                    github_rust_percentage = Some(MINIMUM_RUST_PERCENTAGE);
                                 }
                                 continue;
                             } else if CRATE_REGEX.is_match(&url) {
@@ -861,7 +955,7 @@ async fn main() -> Result<(), Error> {
             }
             Event::Html(content) => {
                 // Allow ToC markers, nothing else
-                // Fix(Otávio): Remove line breaker check
+                // Fix: Remove line break check
                 if !content.contains("<!-- toc") && content != '\n'.into() {
                     return Err(format_err!(
                         "Contains HTML content, not markdown: {}",
